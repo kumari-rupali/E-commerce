@@ -17,17 +17,8 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         const products = await productSvc.getAll();
         if (products && products.length > 0) {
           setProducts(products);
-        } else if (userUid) {
-          // Only seed if we have a user to "own" them initially
-          console.log("Seeding products as user:", userUid);
-          for (const p of MOCK_PRODUCTS) {
-            const { id, ...data } = p;
-            await productSvc.create({ ...data, sellerId: userUid });
-          }
-          const freshProducts = await productSvc.getAll();
-          if (freshProducts) setProducts(freshProducts);
         } else {
-          // Fallback to mock data in state if DB empty and not logged in
+          // Keep demo catalog local; product creation requires an authorized seller.
           setProducts(MOCK_PRODUCTS);
         }
       } catch (err) {
