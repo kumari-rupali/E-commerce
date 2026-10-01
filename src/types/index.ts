@@ -43,6 +43,7 @@ export interface Order {
   status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
   createdAt: string;
   trackingNumber?: string;
+  shippingAddress?: string;
 }
 
 export interface Review {
