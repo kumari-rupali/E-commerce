@@ -19,7 +19,7 @@ const MOCK_ADDRESS_SUGGESTIONS = [
   "Heritage Apartments, Salt Lake City, Kolkata, West Bengal 700091"
 ];
 
-import { orderSvc } from '../lib/db';
+import { orderSvc, userSvc } from '../lib/db';
 import { toast } from 'sonner';
 
 export default function Checkout() {
@@ -30,13 +30,15 @@ export default function Checkout() {
   const [loading, setLoading] = useState(false);
 
   const handlePlaceOrder = async () => {
-    if (!user) return;
+    if (!user) { toast.error('Please sign in before placing an order.'); return; }
+    if (!selectedAddress.trim()) { toast.error('Please select a shipping address.'); setCurrentStep('address'); return; }
     setLoading(true);
     try {
       await orderSvc.create({
         userId: user.uid,
         items: cart,
-        total,
+        total: subtotal + subtotal * 0.08,
+        shippingAddress: selectedAddress.trim(),
         status: 'pending',
         createdAt: new Date().toISOString(),
       });
@@ -100,7 +102,7 @@ export default function Checkout() {
     setSuggestions([]);
   };
 
-  const saveAddress = () => {
+  const saveAddress = async () => {
     if (!addressInput.trim() || !user) return;
     
     let updatedAddresses = [...(user.addresses || [])];
@@ -110,28 +112,44 @@ export default function Checkout() {
       updatedAddresses = [addressInput.trim(), ...updatedAddresses];
     }
     
-    setUser({ ...user, addresses: updatedAddresses });
-    setSelectedAddress(addressInput.trim());
-    resetForm();
+    try {
+      await userSvc.updateProfile(user.uid, { addresses: updatedAddresses });
+      setUser({ ...user, addresses: updatedAddresses });
+      setSelectedAddress(addressInput.trim());
+      resetForm();
+    } catch {
+      toast.error('Could not save address. Please try again.');
+    }
   };
 
-  const deleteAddress = (index: number, e: React.MouseEvent) => {
+  const deleteAddress = async (index: number, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!user) return;
     const updated = user.addresses?.filter((_, i) => i !== index) || [];
-    setUser({ ...user, addresses: updated });
+    try {
+      await userSvc.updateProfile(user.uid, { addresses: updated });
+      setUser({ ...user, addresses: updated });
+    } catch {
+      toast.error('Could not delete address. Please try again.');
+      return;
+    }
     if (selectedAddress === user.addresses?.[index]) {
       setSelectedAddress(updated[0] || '');
     }
   };
 
-  const setDefaultAddress = (index: number, e: React.MouseEvent) => {
+  const setDefaultAddress = async (index: number, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!user || !user.addresses) return;
     const addr = user.addresses[index];
     const updated = [addr, ...user.addresses.filter((_, i) => i !== index)];
-    setUser({ ...user, addresses: updated });
-    setSelectedAddress(addr);
+    try {
+      await userSvc.updateProfile(user.uid, { addresses: updated });
+      setUser({ ...user, addresses: updated });
+      setSelectedAddress(addr);
+    } catch {
+      toast.error('Could not update default address. Please try again.');
+    }
   };
 
   const startEdit = (index: number, e: React.MouseEvent) => {
@@ -481,11 +499,11 @@ export default function Checkout() {
                       className="group w-full py-5 bg-cta text-white rounded-2xl font-black text-sm tracking-[0.1em] uppercase shadow-2xl shadow-cta/30 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
                     >
                       {loading ? <Loader2 className="animate-spin" size={20} /> : <CheckCircle2 size={20} />}
-                      Confirm & Pay {formatPrice(total + (subtotal * 0.08), currency)}
+                      Place Demo Order {formatPrice(subtotal + (subtotal * 0.08), currency)}
                     </button>
                     <p className="text-center text-[10px] font-bold text-gray-400 flex items-center justify-center gap-2">
                       <ShieldCheck size={14} className="text-green-500" />
-                      Your data is protected with 256-bit encryption
+                      Demo checkout — no payment is processed
                     </p>
                   </div>
                 </motion.div>
